@@ -1,0 +1,16 @@
+# Large screenshots
+*.png
+
+# Large result dumps (agent outputs)
+adk-results.json
+comparison-results.json
+eval-results.json
+judge-results.json
+judge-grounded-results.json
+judge-programmatic.json
+judge-programmatic-v2.json
+final-comparison.json
+sequential-output.json
+
+# Generated report (embedded in deliverable.html)
+report.md

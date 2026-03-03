@@ -1,0 +1,55 @@
+description: Competitive Analysis Prompt Evaluation
+
+providers:
+  - id: google:gemini-2.5-flash
+    config:
+      apiKey: AIzaSyCp7-4EUG9I8RcufAJ_yi7uy9ckbB9siyU
+
+prompts:
+  - file://prompt.txt
+
+defaultTest:
+  options:
+    timeout: 120000  # 2 min timeout for web search
+
+tests:
+  # Test 1: Baseline - West Elm vs CB2 (our original use case)
+  - description: "Baseline: West Elm vs CB2"
+    vars:
+      COMPETITOR_A: West Elm
+      COMPETITOR_B: CB2
+    assert:
+      - type: contains
+        value: "Executive Summary"
+      - type: contains
+        value: "Sources"
+      - type: contains
+        value: "Strategic Implications"
+      - type: llm-rubric
+        value: "Output covers all 4 dimensions: homepage messaging, promotional offers, product discovery, and AI features"
+      - type: llm-rubric
+        value: "Contains at least 3 source URLs"
+
+  # Test 2: Different vertical - mass market furniture
+  - description: "Different vertical: Wayfair vs Overstock"
+    vars:
+      COMPETITOR_A: Wayfair
+      COMPETITOR_B: Overstock
+    assert:
+      - type: contains
+        value: "Executive Summary"
+      - type: llm-rubric
+        value: "Analysis is specific to Wayfair and Overstock, not generic furniture industry content"
+      - type: llm-rubric
+        value: "Identifies key differences in their business models or positioning"
+
+  # Test 3: Null case - one competitor with limited AI presence
+  - description: "Null case handling: IKEA vs Target Home"
+    vars:
+      COMPETITOR_A: IKEA
+      COMPETITOR_B: Target Home
+    assert:
+      - type: contains
+        value: "Executive Summary"
+      - type: llm-rubric
+        value: "If AI features are absent for either competitor, explicitly states this rather than making up features"
