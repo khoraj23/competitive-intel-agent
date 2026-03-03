@@ -702,6 +702,7 @@
   <button class="tab-btn" data-tab="journey">Journey</button>
   <button class="tab-btn" data-tab="evaluation">Evaluation</button>
   <button class="tab-btn" data-tab="adoption">Adoption</button>
+  <button class="tab-btn" data-tab="config">Agent Config</button>
 </div>
 
 <!-- ================================================================== -->
@@ -1768,6 +1769,205 @@ tests:
 
   <div class="callout anim" style="--i:10">
     <strong>The strategy:</strong> Email gets the broadest adoption. The Claude Skill gets the deepest usage. Scheduled monitoring gets the most consistent value. Together they ensure the agent isn't a demo — it's a tool that gets used.
+  </div>
+
+</div>
+
+<!-- ================================================================== -->
+<!-- TAB 5: AGENT CONFIGURATION -->
+<!-- ================================================================== -->
+<div id="tab-config" class="tab-panel">
+
+  <div class="hero anim" style="--i:0">
+    <h1>Agent <span>Configuration</span></h1>
+    <p class="lead">The final prompts, tools, and wiring that power the competitive intelligence agent. Every component shown here runs in production.</p>
+    <div class="meta">ADK SequentialAgent &middot; Gemini 2.5 Flash &middot; Google Search Grounding</div>
+  </div>
+
+  <!-- Architecture Overview -->
+  <div class="sec-head anim" style="--i:1"><span class="dot" style="background:var(--navy)"></span> Architecture</div>
+
+  <div class="ve-card ve-card--hero anim" style="--i:2">
+    <div class="ve-card__label" style="color:var(--navy)">Agent Topology</div>
+    <div style="background:var(--surface2); border-radius:8px; padding:20px 24px; font-family:var(--font-mono); font-size:13px; line-height:1.8; white-space:pre; overflow-x:auto; color:var(--text);">SequentialAgent ("competitive_analysis")
+├── ParallelAgent ("parallel_research")
+│   ├── LlmAgent ("researcher_a")
+│   │   ├── model: gemini-2.5-flash
+│   │   ├── tools: [grounded_research]
+│   │   └── output_key: "research_a"  →  writes to session state
+│   └── LlmAgent ("researcher_b")
+│       ├── model: gemini-2.5-flash
+│       ├── tools: [grounded_research]
+│       └── output_key: "research_b"  →  writes to session state
+└── LlmAgent ("synthesizer")
+    ├── model: gemini-2.5-flash
+    ├── reads: {research_a}, {research_b} from state
+    └── output_key: "synthesis"</div>
+    <p style="font-size:13px; color:var(--text-dim); margin-top:14px; line-height:1.5;">Both researchers run in parallel via <strong>ParallelAgent</strong>. Each writes its output to session state via <code style="font-family:var(--font-mono); font-size:12px; background:var(--surface2); padding:2px 6px; border-radius:4px;">output_key</code>. The synthesizer reads both research profiles from state and produces the final comparative analysis.</p>
+  </div>
+
+  <!-- grounded_research Tool -->
+  <div class="sec-head anim" style="--i:3"><span class="dot" style="background:var(--teal)"></span> Custom Tool</div>
+
+  <div class="ve-card anim" style="--i:4">
+    <div class="ve-card__label" style="color:var(--teal)">grounded_research(query: str) → str</div>
+    <p style="font-size:14px; line-height:1.6; margin-bottom:14px;">The single tool available to both researcher agents. Calls the Gemini REST API with Google Search grounding enabled, returning a source-cited response for any research question.</p>
+    <div style="background:var(--surface2); border-radius:8px; padding:16px 20px; font-family:var(--font-mono); font-size:12px; line-height:1.6; overflow-x:auto; white-space:pre; color:var(--text-dim);">def grounded_research(query: str) -> str:
+    """Research a topic using Google Search grounding.
+
+    Sends the query to Gemini with automatic Google Search
+    grounding enabled, which exhaustively searches the web
+    and returns a grounded response with source citations.
+    Use this for each research question or dimension."""
+
+    payload = {
+        "contents": [{"parts": [{"text": query}]}],
+        "tools": [{"google_search": {}}],     ← grounding enabled
+    }
+    resp = requests.post(GROUNDING_URL, json=payload)
+
+    # Extract text + source URLs from groundingMetadata
+    # Returns: research text + "### Grounding Sources" with URLs</div>
+    <p style="font-size:13px; color:var(--text-dim); margin-top:14px; line-height:1.5;">Source URLs are extracted from <code style="font-family:var(--font-mono); font-size:12px; background:var(--surface2); padding:2px 6px; border-radius:4px;">groundingMetadata.groundingChunks</code> and appended to every response, ensuring full citation traceability in the final report.</p>
+  </div>
+
+  <!-- Research Instruction -->
+  <div class="sec-head anim" style="--i:5"><span class="dot" style="background:var(--gold)"></span> Researcher Prompt</div>
+
+  <div class="ve-card anim" style="--i:6">
+    <div class="ve-card__label" style="color:var(--gold)">RESEARCH_INSTRUCTION — per-competitor research agent</div>
+    <p style="font-size:14px; line-height:1.6; margin-bottom:14px;">Each researcher agent receives this instruction with <code style="font-family:var(--font-mono); font-size:12px; background:var(--surface2); padding:2px 6px; border-radius:4px;">{competitor}</code> replaced by the target brand. The prompt mandates at least 4–5 <code style="font-family:var(--font-mono); font-size:12px; background:var(--surface2); padding:2px 6px; border-radius:4px;">grounded_research</code> tool calls — one per dimension.</p>
+    <div style="background:var(--surface2); border-radius:8px; padding:16px 20px; font-family:var(--font-mono); font-size:12px; line-height:1.6; overflow-x:auto; white-space:pre; color:var(--text-dim);">You are a competitive intelligence analyst specializing in e-commerce UX.
+
+Analyze {competitor} across four dimensions. Use the `grounded_research`
+tool for EACH dimension separately — that's at least 4 tool calls.
+For Dimension 4 (AI), make an additional call specifically searching for
+"{competitor} AI partnerships press releases tech investments."
+Be thorough. Cite your sources.
+
+Compile the results into your final output.
+Include ALL source URLs from the tool responses. Do not drop any citations.
+
+### Dimension 1: Homepage Messaging &amp; Visual Hierarchy
+- Hero: What is the primary headline/tagline? What imagery style dominates?
+- Visual hierarchy: What's emphasized above the fold?
+- Brand tone: Warm/aspirational vs. editorial/dramatic vs. discount-forward?
+
+### Dimension 2: Promotional Placement &amp; Offers
+- Current promotions: What offers are running?
+- Loyalty programs: What rewards programs exist? Tiers and benefits?
+- Promo strategy: Discount-forward or brand-protection focused?
+
+### Dimension 3: Product Discovery
+- Navigation structure: How are products organized?
+- Search capabilities: What search/filter features exist?
+- Entry points: How many paths into product browsing are available?
+
+### Dimension 4: AI-Powered Features
+- Customer-facing AI: Chatbots, AR/3D, personalized recs, visual search
+- Behind-the-scenes AI: Press releases, tech partnerships, investments
+- If NO AI features found, explicitly state "No AI features identified"
+
+Output findings with bullet points and source links for each dimension.
+End with a Sources section listing all URLs cited.</div>
+  </div>
+
+  <!-- Synthesis Instruction -->
+  <div class="sec-head anim" style="--i:7"><span class="dot" style="background:var(--green)"></span> Synthesizer Prompt</div>
+
+  <div class="ve-card anim" style="--i:8">
+    <div class="ve-card__label" style="color:var(--green)">SYNTHESIS_INSTRUCTION — comparative analysis agent</div>
+    <p style="font-size:14px; line-height:1.6; margin-bottom:14px;">The synthesizer receives both research profiles injected into its instruction via state variables. It produces the final structured output with no additional research calls.</p>
+    <div style="background:var(--surface2); border-radius:8px; padding:16px 20px; font-family:var(--font-mono); font-size:12px; line-height:1.6; overflow-x:auto; white-space:pre; color:var(--text-dim);">You are a competitive intelligence analyst. You have received two
+independent research profiles from your research team.
+
+### Research on {competitor_a}:
+{research_a}
+
+### Research on {competitor_b}:
+{research_b}
+
+Synthesize these into a single comparative analysis. Do NOT conduct
+additional research — work only with what's provided. Focus on:
+1. Where the competitors differ most sharply
+2. Structural advantages one has over the other
+3. Strategic implications for decision-makers
+
+### Output Format
+
+## Executive Summary
+| | {competitor_a} | {competitor_b} |
+|---|---|---|
+| Positioning | [1 sentence] | [1 sentence] |
+| Core Audience | [1 sentence] | [1 sentence] |
+| Key Differentiator | [1 sentence] | [1 sentence] |
+
+[1-2 sentence bottom line]
+
+## Comparative Analysis
+| Dimension | {competitor_a} | {competitor_b} |
+|-----------|----------|-----|
+| Hero approach | | |
+| Above-fold density | | |
+| Photography style | | |
+| Navigation depth | | |
+| Promo prominence | | |
+| Loyalty program | | |
+| AI visibility | | |
+| AI strategy | | |
+
+## Strategic Implications
+| Theme | Implication |
+|-------|-------------|
+[3-5 rows]
+
+## Sources
+[Combine all sources from both research profiles]</div>
+  </div>
+
+  <!-- Key Design Decisions -->
+  <div class="sec-head anim" style="--i:9"><span class="dot" style="background:var(--amber)"></span> Design Decisions</div>
+
+  <div class="ve-card anim" style="--i:10">
+    <div class="ve-card__label" style="color:var(--amber)">Why This Configuration Won</div>
+    <table class="data-table" style="margin-top:8px;">
+      <thead>
+        <tr>
+          <th style="width:30%">Decision</th>
+          <th>Rationale</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>ParallelAgent for research</strong></td>
+          <td>Cuts latency ~50% vs sequential. Each researcher independently calls grounded_research 4–5 times without blocking the other.</td>
+        </tr>
+        <tr>
+          <td><strong>LLM synthesizer (not template)</strong></td>
+          <td>Programmatic merge scored 16/25 vs LLM synthesis at 25/25. The LLM catches nuance, resolves contradictions, and produces genuinely analytical strategic implications.</td>
+        </tr>
+        <tr>
+          <td><strong>output_key → state</strong></td>
+          <td>Clean data handoff. Research profiles flow through ADK session state — no file I/O, no parsing. The synthesizer reads structured context directly.</td>
+        </tr>
+        <tr>
+          <td><strong>4+ tool calls per researcher</strong></td>
+          <td>One call per dimension prevents search dilution. The Dimension 4 (AI) extra call specifically targets press releases and partnerships — the hardest-to-find content.</td>
+        </tr>
+        <tr>
+          <td><strong>Explicit citation mandate</strong></td>
+          <td>"Include ALL source URLs. Do not drop any citations." Without this, models routinely drop 30–50% of source URLs during synthesis.</td>
+        </tr>
+        <tr>
+          <td><strong>Structured output format</strong></td>
+          <td>Tables in the synthesis prompt ensure consistent, scannable output. Exec summary → comparative analysis → strategic implications mirrors how stakeholders consume competitive intel.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout anim" style="--i:11">
+    <strong>The meta-lesson:</strong> The agent's power comes from the prompt architecture, not the model. The same Gemini 2.5 Flash model scored 16/25 with programmatic synthesis and 25/25 with LLM synthesis — the only difference was <em>how</em> the research was combined, not <em>what</em> model did it.
   </div>
 
 </div>
