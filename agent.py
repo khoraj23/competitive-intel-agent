@@ -15,6 +15,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -27,7 +28,7 @@ from google.genai import types
 
 SCRIPT_DIR = Path(__file__).parent
 MODEL = "gemini-2.5-flash"
-API_KEY = "REDACTED"
+API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GROUNDING_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={API_KEY}"
 
 
